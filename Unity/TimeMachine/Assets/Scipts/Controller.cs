@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using Michsky.UI.ModernUIPack;
+using TMPro;
 using UnityEditor.U2D;
 using UnityEngine;
 
@@ -11,19 +12,37 @@ public class Controller : MonoBehaviour
     [SerializeField] private string ipAddress;
     [SerializeField] private int port;
 
-    [SerializeField] private float incomingValue;
-    [SerializeField] private string outgoingValue;
-    [SerializeField] private bool connected;
     
+    [SerializeField] private string incomingRaw;
+    [SerializeField] private float val1;
+    [SerializeField] private float pingTime;
+    [SerializeField] private string outgoingValue;
+    
+    
+    private bool connected;    
     private readonly WifiConnection _comm = new WifiConnection();
 
     public AnimatedIconHandler connectionIndicator;
+    public TextMeshProUGUI statusText;
     private bool _showingConnected;
     
 
     // Update is called once per frame
     void Update()
     {
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            _comm.PingDevice();
+        }
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+            _comm.StartContinuousPinging();
+        }
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            _comm.StopContinuousPinging();
+        }
+
         if (Input.GetKeyDown(KeyCode.T))
         {
             connectionIndicator.ClickEvent();
@@ -31,7 +50,7 @@ public class Controller : MonoBehaviour
     
         if (Input.GetKeyDown(KeyCode.D))
         {
-            _comm.CloseConnection();
+            _comm.CloseConnection("Manually Disconnected");
         }
         
         
@@ -45,16 +64,23 @@ public class Controller : MonoBehaviour
             _comm.WriteToArduino(outgoingValue);
         }
 
+        incomingRaw = _comm.rawValue;
+        val1 = _comm.val1;
+        pingTime = _comm.pingTime;
         
-        incomingValue = _comm.CurrentValue;
-        connected = _comm.Connected;
+        connected = _comm.connected;
+        statusText.text = _comm.status;
+        
         
         UpdateConnectedIcon(connected);
     }
 
     private void ConnectToEsp()
     {
-        Debug.Log("Attempting connection...");
+        if (connected)
+        {
+            return;
+        }
         _comm.Begin(ipAddress, port);
     }
 

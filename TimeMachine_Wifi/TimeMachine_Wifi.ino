@@ -10,6 +10,9 @@ const char* ssid = "Martin Router King";
 const char* password = "password";
 const int port = 26;
 
+int pingReturnValue = 0;
+int requestDisconnect = 0; //Set to 1 to initiate controlled disconnect
+
 WiFiServer server(port);
 WiFiClient client;
 
@@ -70,9 +73,7 @@ void loop() {
       ReadEncoder();
       
       if (digitalRead(BTN) == 0) {
-        client.print(301);
-        client.print('\r');
-        client.stop();
+        requestDisconnect = 1;
       }
 
       if (client.available() > 0) {
@@ -87,13 +88,25 @@ void loop() {
         Serial.println(" Done!");
         Serial.print("Recived Data: ");
         Serial.println(tempString);
+
+        if(getValue(tempString,':',0)=="Ping"){
+          pingReturnValue = getValue(tempString,':',1).toInt();
+        }
+
+        
       }
 
       float sensorVal = counter;
 
+      String toPc = "VAL:" + String(sensorVal)+ ":" + String(requestDisconnect)+":"+pingReturnValue;
       // Send the distance to the client, along with a break to separate our messages
-      client.print(sensorVal);
+      client.print(toPc);
       client.print('\r');
+
+      if(requestDisconnect == 1){
+        client.stop();
+        requestDisconnect = 0;
+      }
 
       // Delay before the next reading
       //delay(10);
@@ -149,4 +162,20 @@ void ContentPositionCorrection() {
   if (counter < -currentLengthOfSequence + 8) {
     counter = -currentLengthOfSequence + 8;
   }
+}
+
+String getValue(String data, char separator, int index)
+{
+    int found = 0;
+    int strIndex[] = { 0, -1 };
+    int maxIndex = data.length() - 1;
+
+    for (int i = 0; i <= maxIndex && found <= index; i++) {
+        if (data.charAt(i) == separator || i == maxIndex) {
+            found++;
+            strIndex[0] = strIndex[1] + 1;
+            strIndex[1] = (i == maxIndex) ? i+1 : i;
+        }
+    }
+    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
