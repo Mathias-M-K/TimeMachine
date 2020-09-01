@@ -18,7 +18,7 @@ public class WifiConnection
     public bool connected;
 
     public string status = "Disconnected";
-    private string queuedStatus = "Lost Connection";    //message queued 
+    private string queuedStatus = "Default Message";    //message queued 
     
     private int currentPing = 0;
     
@@ -45,6 +45,7 @@ public class WifiConnection
     public void Begin(string ipAddress, int port)
     {
         connectedMessageDelivered = false;
+        externalDisconnectPrompt = false;
 
 
         // Give the network stuff its own special thread
@@ -85,6 +86,8 @@ public class WifiConnection
             var buffer = new List<byte>();
 
             status = "Connected";
+            Debug.Log($"ExternalDisconnectPrompt-Start:{externalDisconnectPrompt}");
+            
             while (client.Connected)
             {
                 if (!connectedMessageDelivered)
@@ -103,8 +106,12 @@ public class WifiConnection
                 }
                 catch (Exception e)
                 {
-                    Debug.Log("Here");
-                    // ignored
+                    Debug.Log($"Read exception error");
+
+                    if (!queuedStatus.Equals("Lost Connection"))
+                    {
+                        CloseConnection("Device reset");
+                    }
                 }
 
 
@@ -128,6 +135,7 @@ public class WifiConnection
                     //Checking for disconnect value
                     if (temp2 == 1 || externalDisconnectPrompt)
                     {
+                        Debug.Log($"Client connection force closed: temp2:{temp2}, externalDisconnectprompt:{externalDisconnectPrompt}, QueuedStatus:{queuedStatus}");
                         break;
                     }
 
@@ -141,11 +149,14 @@ public class WifiConnection
                     buffer.Add((byte) read);
                 }
             }
-
+            
+            Debug.Log("Exiting while-loop");
             status = queuedStatus;
-            queuedStatus = "Lost Connection";
+            queuedStatus = "Disconnected";
             connectedMessageDelivered = false;
             externalDisconnectPrompt = false;
+            
+            Debug.Log($"ExternalDisconnectPrompt-End:{externalDisconnectPrompt}");
             connected = false;
         });
 
@@ -170,6 +181,8 @@ public class WifiConnection
 
     public void PingDevice()
     {
+        if (!connected) return;
+
         Random rnd = new Random();
         int newPing = rnd.Next(0,254);
         if (newPing == currentPing)
@@ -180,7 +193,9 @@ public class WifiConnection
         {
             currentPing = newPing;
         }
-
+        
+        Debug.Log($"Pinging Device!");
+        
         Thread waitForPing = new Thread(() =>
         {
             WriteToArduino($"Ping:{currentPing}");
@@ -191,18 +206,26 @@ public class WifiConnection
             {
                 if (sw.Elapsed.Seconds > 2)
                 {
+                    Debug.Log($"Ping timed out!");
+
+                    if (!connected) return;
+
+                    status = "Ping timed out";
                     CloseConnection("Lost Connection");
+                    
                     return;
                 }
             }
 
+            Debug.Log("Ping response received!");
+            
             pingTime = sw.Elapsed.Milliseconds;
         });
 
         waitForPing.Start();
     }
 
-    public void ContinuousPinging(object state)
+    private void ContinuousPinging(object state)
     {
         if (!connected)
         {

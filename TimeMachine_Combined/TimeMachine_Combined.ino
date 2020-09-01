@@ -1,13 +1,13 @@
 #include <FastLED.h>
 
-#define btn1 16
-#define btn2 5
+#define btn1 13   //D0
+#define btn2 15    //D1
 
 
 //LED Values
 #define NUM_LEDS 60
-#define DATA_PIN 4
-#define CLOCK_PIN 0
+#define DATA_PIN 14    //D5
+#define CLOCK_PIN 12   //D6
 
 CRGB leds[NUM_LEDS];
 

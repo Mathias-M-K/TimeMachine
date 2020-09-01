@@ -1,8 +1,13 @@
+#include <Servo.h>
+
+
 #define OUTPUT_A 5 //data
 #define OUTPUT_B 4  //clock
 #define BTN 0  //btn
 
 int counter = 0;
+int oldCounter = 0;
+float timesinceLastServoWrite = 0;
 int aState;
 int aLastState;
 
@@ -10,15 +15,32 @@ bool lockRotaryEncoder = false;
 
 int currentLengthOfSequence;
 
+
+//Servo
+Servo myservo;  // create servo object to control a servo
+// twelve servo objects can be created on most boards
+
+int pos = 0;    // variable to store the servo position
+
 void setup(){
   Serial.begin(74880);
   pinMode (OUTPUT_A, INPUT);
   pinMode (OUTPUT_B, INPUT);
   pinMode(BTN,INPUT);
+
+  myservo.attach(2);  // attaches the servo on pin 9 to the servo object
+  //myservo.write(0);
 }
 
 void loop(){
   ReadEncoder();
+
+  
+  if(counter != oldCounter){
+    Serial.println("NEW VAL!");
+    oldCounter = counter;
+    myservo.write(counter );
+  }
 }
 
 void ReadEncoder() {
