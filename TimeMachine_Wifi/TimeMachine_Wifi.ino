@@ -13,10 +13,17 @@
 CRGB leds[NUM_LEDS];
 
 //WaitingEffect Values
-int ledOn = -1;
-int ledOff = 0;
+int ledLeftOn = -1;
+int ledLeftOff = 0;
+int ledRightOn = 121;
+int ledRightOff = 120;
 int ledWaveWidth = 7;
 float roundTime = 15;
+
+//Timetravel values
+bool timeTravelActivated = false;
+String ledTravelDirection = "up";
+float timeTravelStartTime = 0;
 
 CRGB waveColor = CRGB(225, 100, 0);
 CRGB waveColorBack = CRGB(0, 0, 0);
@@ -118,6 +125,10 @@ void loop() {
         if(getValue(tempString, ':', 0) == "Servo"){
           myservo.write(getValue(tempString, ':', 1).toInt());
         }
+        if(getValue(tempString, ':', 0) == "TimeTravel"){
+          StartTimeTravel();
+        }
+        
       }
 
       String toPc = "VAL:" + String(btn1Value) + ":" + String(btn2Value) + ":" + "Status_Message" + ":" + String(requestDisconnect) + ":" + pingReturnValue;
@@ -168,8 +179,19 @@ void PrintBtns() {
 
 void LightControl() {
   ConfimConnected();
-  Lights_Wait();
+
+  if (timeTravelActivated) {
+    Lights_Go();
+  } else {
+    Lights_Wait();
+  }
+  //Lights_Wait();
   FastLED.show();
+}
+
+void StartTimeTravel() {
+  timeTravelStartTime = millis();
+  timeTravelActivated = true;
 }
 
 void ConfimConnected() {
@@ -254,25 +276,130 @@ void Lights_Wait() {
     lastHitTime = millis();
 
     //Determine which led to turn on
-    ledOn++;
+    ledLeftOn++;
+    ledRightOn--;
 
-    if (ledOn > NUM_LEDS) {
-      ledOn = 0;
+    if (ledLeftOn > 60) {
+      ledLeftOn = 0;
+    }
+    if (ledRightOn < 60) {
+      ledRightOn = 120;
     }
 
-    leds[ledOn] = waveColor;
+    leds[ledLeftOn] = waveColor;
+    leds[ledRightOn] = waveColor;
 
     //Determine which led to turn off
-    int controlInt = ledOn - ledWaveWidth;
+    int controlIntLeft = ledLeftOn - ledWaveWidth;
+    int controlIntRight = ledRightOn + ledWaveWidth;
 
-    if (controlInt >= 0 && controlInt <= NUM_LEDS) {
-      ledOff = controlInt;
-      leds[ledOff] = waveColorBack;
+    //Left
+    if (controlIntLeft >= 0 && controlIntLeft <= NUM_LEDS) {
+      ledLeftOff = controlIntLeft;
+      leds[ledLeftOff] = waveColorBack;
     }
-    if (controlInt < 0) {
-      ledOff = NUM_LEDS + controlInt;
-      leds[ledOff] = waveColorBack;
+    if (controlIntLeft < 0) {
+      ledLeftOff = NUM_LEDS + controlIntLeft;
+      leds[ledLeftOff] = waveColorBack;
     }
+
+    //Right
+    if (controlIntRight >= 60 && controlIntRight <= 120) {
+      ledRightOff = controlIntRight;
+      leds[ledRightOff] = waveColorBack;
+    }
+    if (controlIntRight > 120) {
+      ledRightOff = 60 + (controlIntRight - 120);
+      leds[ledRightOff] = waveColorBack;
+    }
+
+  }
+}
+
+void Lights_Go() {
+
+  float timeProgression = millis() - timeTravelStartTime;
+
+  roundTime = map(timeProgression, 0, 10000, 15, 0);
+
+  if (timeProgression > 10000 && timeProgression < 12000) {
+    float newFadeValue = map(timeProgression, 10000, 12000, 255, 0);
+
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, newFadeValue, 0);
+    }
+    return;
+  }
+
+  if (timeProgression > 12000 && timeProgression < 13000) {
+    float newFadeValue = map(timeProgression, 12000, 13000, 0, 80);
+
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(0, 0, newFadeValue);
+    }
+    return;
+  }
+
+  if(timeProgression > 14000){
+    roundTime = 15;
+    timeTravelActivated = false;
+    return;
+  }
+
+  if (millis() - lastHitTime > roundTime) {
+    lastHitTime = millis();
+
+    if (ledLeftOn + 1 == 61) {
+      ledTravelDirection = "down";
+
+      ledLeftOn = 60 - ledWaveWidth + 1;
+      ledRightOn = 60 + ledWaveWidth - 1;
+    }
+    if (ledLeftOn - 1 == -1) {
+      ledTravelDirection = "up";
+
+      ledLeftOn = ledWaveWidth - 1;
+      ledRightOn = 120 - ledWaveWidth + 1;
+    }
+
+    if (ledTravelDirection == "up") {
+      ledLeftOn++;
+      ledLeftOff = ledLeftOn - ledWaveWidth;
+
+      ledRightOn--;
+      ledRightOff = ledRightOn + ledWaveWidth;
+
+      if (ledRightOff > 119) {
+        ledRightOff = 119;
+      }
+    }
+
+    if (ledTravelDirection == "down") {
+      ledLeftOn--;
+      ledLeftOff = ledLeftOn + ledWaveWidth;
+
+      ledRightOn++;
+
+      //Stupid code that is stupid
+
+      if (ledRightOn > 119) {
+        ledRightOn = 119;
+      }
+
+      ledRightOff = ledRightOn - ledWaveWidth;
+    }
+
+
+    leds[ledLeftOn] = waveColor;
+    leds[ledLeftOff] = waveColorBack;
+
+
+    if (ledRightOn > 119 || ledRightOff > 119) {
+      Serial.println("Wtf error");
+    }
+
+    leds[ledRightOn] = waveColor;
+    leds[ledRightOff] = waveColorBack;
   }
 }
 

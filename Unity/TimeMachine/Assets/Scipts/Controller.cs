@@ -1,4 +1,5 @@
-﻿using Michsky.UI.ModernUIPack;
+﻿using System;
+using Michsky.UI.ModernUIPack;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -10,8 +11,8 @@ public class Controller : MonoBehaviour
 
     
     [SerializeField] private string incomingRaw;
-    [SerializeField] private float btn1;
-    [SerializeField] private float btn2;
+    [SerializeField] public float btn1;
+    [SerializeField] public float btn2;
     [SerializeField] private float pingTime;
 
 
@@ -20,11 +21,19 @@ public class Controller : MonoBehaviour
     
     public TextMeshProUGUI statusText;
     public TextMeshProUGUI pingShow;
+    private AudioSource player;
+    public AudioClip timeMachineSound;
+    
     private bool _showingConnected;
 
     public Image img;
     private bool userPanelActive = false;
-    
+
+    private void Start()
+    {
+        player = GetComponent<AudioSource>();
+        ConnectToEsp();
+    }
 
     // Update is called once per frame
     void Update()
@@ -103,25 +112,9 @@ public class Controller : MonoBehaviour
         _comm.PingDevice();
     }
 
-    public void ServoUp()
+    public void InitiateTimeTravel()
     {
-        print("Servo Up!");
-        _comm.WriteToArduino($"Servo:1");
-    }
-    public void ServoDown()
-    {
-        print("Servo Down!");
-        _comm.WriteToArduino($"Servo:180");
-    }
-
-    public void ServoStop()
-    {
-        print("Servo Stop!");
-        _comm.WriteToArduino("Servo:95");
-    }
-
-    public void PrintTest()
-    {
-        Debug.Log("Pointer lifted");
+        player.Play();
+        _comm.WriteToArduino("TimeTravel:0");
     }
 }

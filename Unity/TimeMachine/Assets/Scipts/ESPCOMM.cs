@@ -29,7 +29,7 @@ public class WifiConnection
     private bool connectedMessageDelivered;
     private bool externalDisconnectPrompt;
     private bool initialPingCompleted;
-    
+
     //Ping values
     public float pingTime = 0;    //Current ping
     private float pingResponse = 0;    //Ping-response received from external device
