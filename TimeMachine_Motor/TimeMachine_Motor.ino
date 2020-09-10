@@ -5,7 +5,7 @@ int motorSpeed;
 
 void setup()
 {
-  Serial.begin(9600);  //initiate Serial communication
+  Serial.begin(74880);  //initiate Serial communication
   Serial.println("Type in a vale from 0 - 255 and hit enter.");
   pinMode(9, OUTPUT);
 }

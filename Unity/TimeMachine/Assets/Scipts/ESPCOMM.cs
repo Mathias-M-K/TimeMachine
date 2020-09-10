@@ -12,9 +12,7 @@ using Random = System.Random;
 
 public class WifiConnection
 {
-    public string rawValue;
-    public float val1;
-    public float val2;
+    public string incomingDataStream = "VAL:0:0:Status_Message:0:0";
     public bool connected;
 
     public string status = "Disconnected";
@@ -30,6 +28,7 @@ public class WifiConnection
     private Thread myThread;
     private bool connectedMessageDelivered;
     private bool externalDisconnectPrompt;
+    private bool initialPingCompleted;
     
     //Ping values
     public float pingTime = 0;    //Current ping
@@ -60,7 +59,7 @@ public class WifiConnection
                 status = "Attempting connection...";
                 client.Connect(ipAddress, port);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 if (externalDisconnectPrompt)
                 {
@@ -86,8 +85,8 @@ public class WifiConnection
             var buffer = new List<byte>();
 
             status = "Connected";
-            Debug.Log($"ExternalDisconnectPrompt-Start:{externalDisconnectPrompt}");
             
+
             while (client.Connected)
             {
                 if (!connectedMessageDelivered)
@@ -106,7 +105,7 @@ public class WifiConnection
                 }
                 catch (Exception e)
                 {
-                    Debug.Log($"Read exception error");
+                    Debug.Log($"Read exception error {e}");
 
                     if (!queuedStatus.Equals("Lost Connection"))
                     {
@@ -121,21 +120,17 @@ public class WifiConnection
                     // Once we have a reading, convert our buffer to a string, since the values are coming as strings
                     var str = Encoding.ASCII.GetString(buffer.ToArray());
 
-                    rawValue = str;
+                    incomingDataStream = str;
                     // We assume that they're floats
-                    var temp1 = float.Parse(str.Split(':')[1]);
-                    var temp2 = float.Parse(str.Split(':')[2]);
-                    var temp3 = float.Parse(str.Split(':')[3]);
 
-                    val1 = temp1;
-                    val2 = temp2;
-                    pingResponse = temp3;
+                    var disconnectPromptValue = float.Parse(str.Split(':')[4]);
+                    pingResponse = float.Parse(str.Split(':')[5]);
 
 
                     //Checking for disconnect value
-                    if (temp2 == 1 || externalDisconnectPrompt)
+                    if (disconnectPromptValue == 1 || externalDisconnectPrompt)
                     {
-                        Debug.Log($"Client connection force closed: temp2:{temp2}, externalDisconnectprompt:{externalDisconnectPrompt}, QueuedStatus:{queuedStatus}");
+                        Debug.Log($"Client connection force closed: temp2:{disconnectPromptValue}, externalDisconnectprompt:{externalDisconnectPrompt}, QueuedStatus:{queuedStatus}");
                         break;
                     }
 
@@ -147,6 +142,12 @@ public class WifiConnection
                 {
                     // If this wasn't the end of a reading, then just add this new byte to our buffer
                     buffer.Add((byte) read);
+                }
+
+                if (!initialPingCompleted)
+                {
+                    PingDevice();
+                    initialPingCompleted = true;
                 }
             }
             
@@ -171,9 +172,9 @@ public class WifiConnection
             theWriter.Write(dataOut);
             theWriter.Flush();
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            Debug.Log("Found it");
+            Debug.Log($"Found it");
             throw;
         }
         
@@ -251,5 +252,7 @@ public class WifiConnection
         StopContinuousPinging();
         queuedStatus = disconnectStatus;
         externalDisconnectPrompt = true;
+        client.Close();
+        
     }
 }

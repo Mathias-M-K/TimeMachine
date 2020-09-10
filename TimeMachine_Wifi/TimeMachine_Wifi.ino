@@ -1,37 +1,68 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
+#include <FastLED.h>
+#include <Servo.h>
 
-//Potmeter
-#define OUTPUT_A 5 //data
-#define OUTPUT_B 4  //clock
-#define BTN 0  //btn
+#define btn1 13   //D0
+#define btn2 15   //D1
 
+//LED Values
+#define NUM_LEDS 120
+#define DATA_PIN 14    //D5
+#define CLOCK_PIN 12   //D6
+CRGB leds[NUM_LEDS];
+
+//WaitingEffect Values
+int ledOn = -1;
+int ledOff = 0;
+int ledWaveWidth = 7;
+float roundTime = 15;
+
+CRGB waveColor = CRGB(225, 100, 0);
+CRGB waveColorBack = CRGB(0, 0, 0);
+
+float lastHitTime = 0;
+
+//ConfimConnected values
+int fadeSpeed = 5;
+int fadeValue = 0;
+int fadeIncreasing = true;
+int confirmEffectProgressionCounter = 0;
+bool confirmEffectComplete = false;
+float lastTimeSinceHit = 0;
+
+
+/*
+   WIFI VALUES
+*/
 const char* ssid = "Martin Router King";
 const char* password = "password";
 const int port = 26;
 
 int pingReturnValue = 0;
 int requestDisconnect = 0; //Set to 1 to initiate controlled disconnect
+bool clientDisconnectNotify = true;
 
 WiFiServer server(port);
 WiFiClient client;
 
-bool clientDisconnectNotify = true;
+/*
+   BUTTON VALUES
+*/
+int btn1Value;
+int btn2Value;
 
-//Potmeter
-int counter = 0;
-int aState;
-int aLastState;
-bool lockRotaryEncoder = false;
-int currentLengthOfSequence;
-
-
+/*
+   Servo
+*/
+Servo myservo;  // create servo object to control a servo
 
 void setup() {
-  pinMode (OUTPUT_A, INPUT);
-  pinMode (OUTPUT_B, INPUT);
-  pinMode(BTN, INPUT);
-
+  pinMode(btn1, INPUT);
+  pinMode(btn2, INPUT);
+  myservo.attach(2);
+  myservo.write(95);
+  LEDS.addLeds<APA102, DATA_PIN, CLOCK_PIN, BGR>(leds, NUM_LEDS);
 
   Serial.begin(74880);
   Serial.println("");
@@ -58,52 +89,43 @@ void setup() {
 }
 
 void loop() {
-  ReadEncoder();
-
   // Listen for connecting clients
   client = server.available();
+
   if (client) {
     Serial.println("");
     Serial.println("Client connected");
     clientDisconnectNotify = false;
 
-
     while (client.connected()) {
-      
-      ReadEncoder();
-      
-      if (digitalRead(BTN) == 0) {
-        requestDisconnect = 1;
-      }
+
+      //External methods
+      ReadBtns();
+      LightControl();
 
       if (client.available() > 0) {
         Serial.print("Data Available:");
         String tempString;
-
-        Serial.print("Reading...");
         while (client.available() > 0) {
           char c = client.read();
           tempString += c;
         }
-        Serial.println(" Done!");
-        Serial.print("Recived Data: ");
         Serial.println(tempString);
 
-        if(getValue(tempString,':',0)=="Ping"){
-          pingReturnValue = getValue(tempString,':',1).toInt();
+        if (getValue(tempString, ':', 0) == "Ping") {
+          pingReturnValue = getValue(tempString, ':', 1).toInt();
         }
-
-        
+        if(getValue(tempString, ':', 0) == "Servo"){
+          myservo.write(getValue(tempString, ':', 1).toInt());
+        }
       }
 
-      float sensorVal = counter;
-
-      String toPc = "VAL:" + String(sensorVal)+ ":" + String(requestDisconnect)+":"+pingReturnValue;
+      String toPc = "VAL:" + String(btn1Value) + ":" + String(btn2Value) + ":" + "Status_Message" + ":" + String(requestDisconnect) + ":" + pingReturnValue;
       // Send the distance to the client, along with a break to separate our messages
       client.print(toPc);
       client.print('\r');
 
-      if(requestDisconnect == 1){
+      if (requestDisconnect == 1) {
         client.stop();
         requestDisconnect = 0;
       }
@@ -119,7 +141,6 @@ void loop() {
 
   }
 
-
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("");
     Serial.print("Wifi disconnected, trying to reconnect");
@@ -128,54 +149,147 @@ void loop() {
       delay(500);
       Serial.print(".");
     }
-
     Serial.println(" Wifi reconnect successful");
     Serial.println("");
   }
+
+
 }
 
+void ReadBtns() {
+  btn1Value = digitalRead(btn1);
+  btn2Value = digitalRead(btn2);
+}
 
-//Potmeter
-void ReadEncoder() {
-  aState = digitalRead(OUTPUT_A); // Reads the "current" state of the outputA
-  // If the previous and the current state of the outputA are different, that means a Pulse has occured
-  if (aState != aLastState) {
-    // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
-    if (digitalRead(OUTPUT_B) != aState) {
-      counter ++;
+void PrintBtns() {
+  Serial.print("b1: "); Serial.print(btn1Value);
+  Serial.print(" | b2: "); Serial.println(btn2Value);
+}
+
+void LightControl() {
+  ConfimConnected();
+  Lights_Wait();
+  FastLED.show();
+}
+
+void ConfimConnected() {
+  
+
+  if (millis() - lastTimeSinceHit > fadeSpeed) {
+    lastTimeSinceHit = millis();
+
+    if (btn1Value == 1) {
+
+      //Return if effect is complete
+      if (confirmEffectComplete) {
+        return;
+      }
+
+      //Either increase or decrease the fade value
+      if (fadeIncreasing) {
+        fadeValue += 5;
+      } else {
+        fadeValue -= 5;
+      }
+
+      //Enforcing lower boundary
+      if (fadeValue < 20) {
+        fadeValue = 20;
+        fadeIncreasing = true;
+        fadeSpeed = 5;
+      }
+
+      //Enforcing upper boundary
+      if (fadeValue > 255) {
+        fadeValue = 255;
+        fadeIncreasing = false;
+        fadeSpeed = 20;
+      }
+
+      //Stop the effect when the correct parameters have been met
+      if (!fadeIncreasing && fadeValue < 80) {
+        confirmEffectComplete = true;
+      }
+
+      for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = CRGB(0, 0, fadeValue);
+        waveColorBack = CRGB(0, 0, fadeValue);
+      }
+
+      //FastLED.show();
+
     } else {
-      counter --;
-    }
-    //Serial.print("Position: ");
-    //Serial.println(counter);
-  }
-  aLastState = aState; // Updates the previous state of the outputA with the current state
+      confirmEffectComplete = false;
+      fadeValue -= 5;
 
-  if(lockRotaryEncoder){
-    ContentPositionCorrection();
+      if (fadeValue < 0) {
+        fadeValue = 0;
+      }
+
+      if (fadeIncreasing) {
+        return;
+      }
+
+      for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = CRGB(0, 0, fadeValue);
+        waveColorBack = CRGB(0, 0, fadeValue);
+      }
+
+      if (fadeValue == 0) {
+        fadeIncreasing = true;
+      }
+    }
   }
 }
-void ContentPositionCorrection() {
-  if (counter > 0) {
-    counter = 0;
+
+void Lights_Wait() {
+  if (btn2Value == 1) {
+    waveColor = CRGB(225, 100, 0);
   }
-  if (counter < -currentLengthOfSequence + 8) {
-    counter = -currentLengthOfSequence + 8;
+  else {
+    waveColor = waveColorBack;
+  }
+
+  if (millis() - lastHitTime > roundTime) {
+    lastHitTime = millis();
+
+    //Determine which led to turn on
+    ledOn++;
+
+    if (ledOn > NUM_LEDS) {
+      ledOn = 0;
+    }
+
+    leds[ledOn] = waveColor;
+
+    //Determine which led to turn off
+    int controlInt = ledOn - ledWaveWidth;
+
+    if (controlInt >= 0 && controlInt <= NUM_LEDS) {
+      ledOff = controlInt;
+      leds[ledOff] = waveColorBack;
+    }
+    if (controlInt < 0) {
+      ledOff = NUM_LEDS + controlInt;
+      leds[ledOff] = waveColorBack;
+    }
   }
 }
+
+
 
 String getValue(String data, char separator, int index)
 {
-    int found = 0;
-    int strIndex[] = { 0, -1 };
-    int maxIndex = data.length() - 1;
+  int found = 0;
+  int strIndex[] = { 0, -1 };
+  int maxIndex = data.length() - 1;
 
-    for (int i = 0; i <= maxIndex && found <= index; i++) {
-        if (data.charAt(i) == separator || i == maxIndex) {
-            found++;
-            strIndex[0] = strIndex[1] + 1;
-            strIndex[1] = (i == maxIndex) ? i+1 : i;
-        }
+  for (int i = 0; i <= maxIndex && found <= index; i++) {
+    if (data.charAt(i) == separator || i == maxIndex) {
+      found++;
+      strIndex[0] = strIndex[1] + 1;
+      strIndex[1] = (i == maxIndex) ? i + 1 : i;
     }
-    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+  }
+  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }

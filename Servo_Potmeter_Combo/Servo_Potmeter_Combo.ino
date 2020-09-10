@@ -22,24 +22,36 @@ Servo myservo;  // create servo object to control a servo
 
 int pos = 0;    // variable to store the servo position
 
-void setup(){
+void setup() {
   Serial.begin(74880);
   pinMode (OUTPUT_A, INPUT);
   pinMode (OUTPUT_B, INPUT);
-  pinMode(BTN,INPUT);
+  pinMode(BTN, INPUT);
 
   myservo.attach(2);  // attaches the servo on pin 9 to the servo object
   //myservo.write(0);
 }
 
-void loop(){
-  ReadEncoder();
+void loop() {
+  //ReadEncoder();
+  ReadSerial();
 
-  
-  if(counter != oldCounter){
+  if (counter != oldCounter) {
     Serial.println("NEW VAL!");
     oldCounter = counter;
-    myservo.write(counter );
+    myservo.write(counter);
+  }
+}
+void ReadSerial() {
+  if (Serial.available() > 0)
+  {
+    int incomingVal = Serial.parseInt();
+
+    if (incomingVal == 0) {
+      return;
+    }
+
+    counter = incomingVal;
   }
 }
 
@@ -58,7 +70,7 @@ void ReadEncoder() {
   }
   aLastState = aState; // Updates the previous state of the outputA with the current state
 
-  if(lockRotaryEncoder){
+  if (lockRotaryEncoder) {
     ContentPositionCorrection();
   }
 }

@@ -1,39 +1,64 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Net.Sockets;
-using Michsky.UI.ModernUIPack;
+﻿using Michsky.UI.ModernUIPack;
 using TMPro;
-using UnityEditor.U2D;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Controller : MonoBehaviour
 {
-    [SerializeField] private string ipAddress;
-    [SerializeField] private int port;
+    public string ipAddress;
+    public int port;
 
     
     [SerializeField] private string incomingRaw;
-    [SerializeField] private float val1;
+    [SerializeField] private float btn1;
+    [SerializeField] private float btn2;
     [SerializeField] private float pingTime;
-    [SerializeField] private string outgoingValue;
-    
-    
+
+
     private bool connected;    
     private readonly WifiConnection _comm = new WifiConnection();
-
-    public AnimatedIconHandler connectionIndicator;
+    
     public TextMeshProUGUI statusText;
+    public TextMeshProUGUI pingShow;
     private bool _showingConnected;
+
+    public Image img;
+    private bool userPanelActive = false;
     
 
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.P))
+        if (Input.GetKeyDown(KeyCode.Escape))
         {
-            _comm.PingDevice();
+            if (userPanelActive)
+            {
+                LeanTween.moveLocalX(img.gameObject, 2160, 1).setEase(LeanTweenType.easeInOutQuad);
+                userPanelActive = false;
+            }
+            else
+            {
+                LeanTween.moveLocalX(img.gameObject, 0, 1).setEase(LeanTweenType.easeInOutQuad);
+                userPanelActive = true;
+            }
+            
         }
+        
+        if (Input.GetKeyUp(KeyCode.UpArrow) || Input.GetKeyUp(KeyCode.DownArrow))
+        {
+            _comm.WriteToArduino("Servo:95");
+        }
+
+        if (Input.GetKeyDown(KeyCode.UpArrow))
+        {
+            _comm.WriteToArduino("Servo:1");
+        }
+
+        if (Input.GetKeyDown(KeyCode.DownArrow))
+        {
+            _comm.WriteToArduino("Servo:180");
+        }
+        
         if (Input.GetKeyDown(KeyCode.Q))
         {
             _comm.StartContinuousPinging();
@@ -42,40 +67,23 @@ public class Controller : MonoBehaviour
         {
             _comm.StopContinuousPinging();
         }
-
-        if (Input.GetKeyDown(KeyCode.T))
-        {
-            connectionIndicator.ClickEvent();
-        }
-    
-        if (Input.GetKeyDown(KeyCode.D))
-        {
-            _comm.CloseConnection("Manually Disconnected");
-        }
-        
-        
         if (Input.GetKeyDown(KeyCode.C))
         {
             ConnectToEsp();
         }
-        
-        if (Input.GetKeyDown(KeyCode.Return))
-        {
-            _comm.WriteToArduino(outgoingValue);
-        }
 
-        incomingRaw = _comm.rawValue;
-        val1 = _comm.val1;
-        pingTime = _comm.pingTime;
-        
-        connected = _comm.connected;
         statusText.text = _comm.status;
+        connected = _comm.connected;
+
+        incomingRaw = _comm.incomingDataStream;
+        btn1 = float.Parse(_comm.incomingDataStream.Split(':')[1]);
+        btn2 = float.Parse(_comm.incomingDataStream.Split(':')[2]);
         
-        
-        UpdateConnectedIcon(connected);
+        pingTime = _comm.pingTime;
+        pingShow.text = pingTime.ToString();
     }
 
-    private void ConnectToEsp()
+    public void ConnectToEsp()
     {
         if (connected)
         {
@@ -84,12 +92,36 @@ public class Controller : MonoBehaviour
         _comm.Begin(ipAddress, port);
     }
 
-    private void UpdateConnectedIcon(bool state)
+    public void DisconnectEsp()
     {
-        if (state != _showingConnected)
-        {
-            _showingConnected = state;
-            connectionIndicator.ClickEvent();
-        }
+        _comm.CloseConnection("Manually Disconnected");
+    }
+    
+
+    public void PingDeviceButton()
+    {
+        _comm.PingDevice();
+    }
+
+    public void ServoUp()
+    {
+        print("Servo Up!");
+        _comm.WriteToArduino($"Servo:1");
+    }
+    public void ServoDown()
+    {
+        print("Servo Down!");
+        _comm.WriteToArduino($"Servo:180");
+    }
+
+    public void ServoStop()
+    {
+        print("Servo Stop!");
+        _comm.WriteToArduino("Servo:95");
+    }
+
+    public void PrintTest()
+    {
+        Debug.Log("Pointer lifted");
     }
 }
