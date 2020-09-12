@@ -23,7 +23,10 @@ public class Controller : MonoBehaviour
     public TextMeshProUGUI pingShow;
     private AudioSource player;
     public AudioClip timeMachineSound;
-    
+
+    public TMP_InputField manualIp;
+    public TMP_InputField manualPort;
+
     private bool _showingConnected;
 
     public Image img;
@@ -92,6 +95,14 @@ public class Controller : MonoBehaviour
         pingShow.text = pingTime.ToString();
     }
 
+    public void ManualConnect()
+    {
+        if (connected)
+        {
+            return;
+        }
+        _comm.Begin(manualIp.text, int.Parse(manualPort.text));
+    }
     public void ConnectToEsp()
     {
         if (connected)
@@ -117,4 +128,6 @@ public class Controller : MonoBehaviour
         player.Play();
         _comm.WriteToArduino("TimeTravel:0");
     }
+
+    
 }

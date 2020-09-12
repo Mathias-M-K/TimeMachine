@@ -74,8 +74,11 @@ void setup() {
   Serial.begin(74880);
   Serial.println("");
 
+
   WiFi.begin(ssid, password);
   Serial.print("Connecting");
+
+  setLights(255, 0, 0);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -90,6 +93,10 @@ void setup() {
 
   Serial.print("Port: ");
   Serial.println(port);
+
+  setLights(0, 255, 0);
+  delay(2000);
+  // setLights(0, 0, 0);
 
   // Start the TCP server
   server.begin();
@@ -122,13 +129,13 @@ void loop() {
         if (getValue(tempString, ':', 0) == "Ping") {
           pingReturnValue = getValue(tempString, ':', 1).toInt();
         }
-        if(getValue(tempString, ':', 0) == "Servo"){
+        if (getValue(tempString, ':', 0) == "Servo") {
           myservo.write(getValue(tempString, ':', 1).toInt());
         }
-        if(getValue(tempString, ':', 0) == "TimeTravel"){
+        if (getValue(tempString, ':', 0) == "TimeTravel") {
           StartTimeTravel();
         }
-        
+
       }
 
       String toPc = "VAL:" + String(btn1Value) + ":" + String(btn2Value) + ":" + "Status_Message" + ":" + String(requestDisconnect) + ":" + pingReturnValue;
@@ -149,6 +156,8 @@ void loop() {
       Serial.println("Client Disconnected");
       clientDisconnectNotify = true;
     }
+
+    setLights(255,255,0);
 
   }
 
@@ -195,7 +204,7 @@ void StartTimeTravel() {
 }
 
 void ConfimConnected() {
-  
+
 
   if (millis() - lastTimeSinceHit > fadeSpeed) {
     lastTimeSinceHit = millis();
@@ -294,12 +303,12 @@ void Lights_Wait() {
     int controlIntRight = ledRightOn + ledWaveWidth;
 
     //Left
-    if (controlIntLeft >= 0 && controlIntLeft <= NUM_LEDS) {
+    if (controlIntLeft >= 0 && controlIntLeft <= 60) {
       ledLeftOff = controlIntLeft;
       leds[ledLeftOff] = waveColorBack;
     }
     if (controlIntLeft < 0) {
-      ledLeftOff = NUM_LEDS + controlIntLeft;
+      ledLeftOff = 60 + controlIntLeft;
       leds[ledLeftOff] = waveColorBack;
     }
 
@@ -340,7 +349,7 @@ void Lights_Go() {
     return;
   }
 
-  if(timeProgression > 14000){
+  if (timeProgression > 14000) {
     roundTime = 15;
     timeTravelActivated = false;
     return;
@@ -401,6 +410,14 @@ void Lights_Go() {
     leds[ledRightOn] = waveColor;
     leds[ledRightOff] = waveColorBack;
   }
+}
+
+void setLights(int r, int g, int b) {
+
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(r, g, b);
+  }
+  FastLED.show();
 }
 
 

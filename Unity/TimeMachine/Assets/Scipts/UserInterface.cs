@@ -70,6 +70,7 @@ public class UserInterface : MonoBehaviour
     //Time travel prompt
     [Header("Bottom Prompt")]
     public GameObject timeTravelPrompt;
+    private bool timeTravelPromptActive = true;
 
     //Colors
     private readonly Color32 orangeNegative = new Color32(231, 111, 81, 255);
@@ -97,7 +98,7 @@ public class UserInterface : MonoBehaviour
 
         if (gateReady && fluxCapacitorCharged && timeMachineActive && destinationReady)
         {
-            timeTravelPrompt.SetActive(true);
+            TweenInReadyPrompt();
 
             if (Input.GetKeyDown(KeyCode.Space))
             {
@@ -106,7 +107,7 @@ public class UserInterface : MonoBehaviour
         }
         else
         {
-            timeTravelPrompt.SetActive(false);
+            TweenOutReadyPrompt();
         }
 
         messageActiveTime += Time.deltaTime;
@@ -371,5 +372,19 @@ public class UserInterface : MonoBehaviour
         }
 
         return null;
+    }
+    
+    public void TweenOutReadyPrompt()
+    {
+        if (!timeTravelPromptActive) return;
+        LeanTween.moveLocalY(timeTravelPrompt.gameObject, -774, 0.4f).setEase(LeanTweenType.easeOutQuad);
+        timeTravelPromptActive = false;
+    }
+
+    public void TweenInReadyPrompt()
+    {
+        if (timeTravelPromptActive) return;
+        LeanTween.moveLocalY(timeTravelPrompt.gameObject, -570, 0.4f).setEase(LeanTweenType.easeOutQuad);
+        timeTravelPromptActive = true;
     }
 }
