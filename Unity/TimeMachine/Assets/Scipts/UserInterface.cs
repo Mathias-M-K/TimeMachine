@@ -1,16 +1,36 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Messaging;
+using Microsoft.SqlServer.Server;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Random = UnityEngine.Random;
 
 public class UserInterface : MonoBehaviour
 {
+    public static UserInterface interfaceCtrl;
+
+    private void Awake()
+    {
+        if (interfaceCtrl != null)
+        {
+            Destroy(this);
+        }
+        else
+        {
+            interfaceCtrl = this;
+        }
+    }
+
+
     public Controller controller;
 
     //List
-    private readonly List<int> years = new List<int>() {1791, 1995, 2020, 2029};    //Years the machine is able to travel to
+    private readonly List<int>
+        years = new List<int>() {1791, 1995, 2020, 2029}; //Years the machine is able to travel to
+
     private readonly List<DateType> dates = new List<DateType>();
 
     //Status fields
@@ -41,8 +61,9 @@ public class UserInterface : MonoBehaviour
      */
     //Timemachine
     private bool timeMachineActive;
+
     private float activeTime;
-    
+
     private bool destinationReady;
     private bool gateReady;
 
@@ -58,6 +79,8 @@ public class UserInterface : MonoBehaviour
     [Header("DestinationFields")] public Image destinationPanel;
     public TextMeshProUGUI messageField;
     public TMP_InputField destinationYearInput;
+    public TMP_InputField destinationMonthInput;
+    public TMP_InputField destinationDayInput;
 
     private DateType destinationDate;
     private bool destinationPanelActive;
@@ -66,42 +89,54 @@ public class UserInterface : MonoBehaviour
     private int timeTravelYear = 0;
     private float destinationCalculation = 0;
     private bool destinationFieldShouldBeUpdated;
-    
+    private float punctuationTimer = 0;
+
     //Time travel prompt
-    [Header("Bottom Prompt")]
-    public GameObject timeTravelPrompt;
+    [Header("Bottom Prompt")] public GameObject timeTravelPrompt;
     private bool timeTravelPromptActive = true;
 
     //Colors
     private readonly Color32 orangeNegative = new Color32(231, 111, 81, 255);
     private readonly Color32 orangeMild = new Color32(233, 196, 106, 255);
     private readonly Color32 blue = new Color32(81, 186, 231, 255);
+    
+    
+    //Debug
+    private bool developerOverride = false;
 
 
     private void Start()
     {
         //April 27, 1791
-        dates.Add(new DateType(1995, 30, 11, 1995, 2, 00, 00));
-        dates.Add(new DateType(1791, 27, 4, 1791, 22, 30, 00));
-        dates.Add(new DateType(2029, DateTime.Now.Day, DateTime.Now.Month, 2029, DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second));
+        //dates.Add(new DateType(1995, 30, 11, 1995, 2, 00, 00));
+        //dates.Add(new DateType(1791, 27, 4, 1791, 22, 30, 00));
+        //dates.Add(new DateType(2029, DateTime.Now.Day, DateTime.Now.Month, 2029, DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second));
     }
 
     // Update is called once per frame
     void Update()
     {
+        //Debug Methods
+        if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.R))
+        {
+            ReadyAllSystems();
+        }
+
+
         UpdatePresentDayFields();
-        
+
         if (destinationFieldShouldBeUpdated)
         {
             UpdateDestinationFields();
         }
 
-        if (gateReady && fluxCapacitorCharged && timeMachineActive && destinationReady)
+        if ((gateReady && fluxCapacitorCharged && timeMachineActive && destinationReady) || developerOverride)
         {
             TweenInReadyPrompt();
 
             if (Input.GetKeyDown(KeyCode.Space))
             {
+                TimeTravelReadyPanelController.timeTravelReadyPanelController.TimeTravelStart();
                 controller.InitiateTimeTravel();
             }
         }
@@ -112,15 +147,25 @@ public class UserInterface : MonoBehaviour
 
         messageActiveTime += Time.deltaTime;
         destinationCalculation += Time.deltaTime;
-        
-        
+
+
         float msgActiveTime = 3; //How long before message resets
+
+
+        if (messageActiveTime - punctuationTimer >= 0.2f && yearAccepted)
+        {
+            messageField.text += ".";
+            punctuationTimer = messageActiveTime;
+        }
+
+
         if (messageActiveTime >= msgActiveTime)
         {
             if (yearAccepted)
             {
+                print("Accepted, preping systems");
                 messageField.text = "Accepted";
-                SetDestinationFields("N/A",orangeNegative);
+                SetDestinationFields("N/A", orangeNegative);
                 destinationCalculation = 0;
                 destinationDate = FetchDateData(timeTravelYear);
                 destinationFieldShouldBeUpdated = true;
@@ -148,11 +193,29 @@ public class UserInterface : MonoBehaviour
             gateReady = false;
         }
 
-        if (Input.GetKeyDown(KeyCode.Return))
+        /*if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
         {
             if (destinationPanelActive)
             {
-                if (CheckDestinationYear(int.Parse(destinationYearInput.text)))
+                int day;
+                int month;
+                int year;
+                try
+                {
+                    day = int.Parse(destinationDayInput.text);
+                    month = int.Parse(destinationMonthInput.text);
+                    year = int.Parse(destinationYearInput.text);
+                }
+                catch (Exception e)
+                {
+                    print("Invalid input - Destination");
+                    DestinationSelectController.destinationController.ResetFields();
+                    messageField.text = "Invalid input";
+                    messageActiveTime = 0;
+                    return;
+                }
+                
+                if (CheckDestination(day,month,year)) //Originally coded to check if the year is correct
                 {
                     messageField.text = "Calculating Destination";
                     yearAccepted = true;
@@ -170,13 +233,24 @@ public class UserInterface : MonoBehaviour
                 LeanTween.moveLocalY(destinationPanel.gameObject, 0, 0.3f).setEase(LeanTweenType.easeInOutQuad);
                 destinationPanelActive = true;
                 messageField.text = "Enter destination year";
-                destinationYearInput.text = "";
-                destinationYearInput.Select();
-                destinationYearInput.ActivateInputField();
+                DestinationSelectController.destinationController.ResetFields();
+            }
+        }*/
+
+        /*
+         * New COde
+         */
+        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            if (!destinationPanelActive)
+            {
+                LeanTween.moveLocalY(destinationPanel.gameObject, 0, 0.3f).setEase(LeanTweenType.easeInOutQuad);
+                destinationPanelActive = true;
+                messageField.text = "Enter destination year";
+                DestinationSelectController.destinationController.ResetFields();
             }
         }
 
-        
 
         if (controller.btn1 == 1)
         {
@@ -250,6 +324,53 @@ public class UserInterface : MonoBehaviour
         }
     }
 
+    private void ReadyAllSystems()
+    {
+        print("Readying Systems");
+        gateReady = true;
+        fluxCapacitorCharged = true;
+        timeMachineActive = true;
+        developerOverride = true;
+    }
+
+    public void TimeTravel()
+    {
+        if (destinationPanelActive)
+        {
+            int day;
+            int month;
+            int year;
+            try
+            {
+                day = int.Parse(destinationDayInput.text);
+                month = int.Parse(destinationMonthInput.text);
+                year = int.Parse(destinationYearInput.text);
+            }
+            catch (Exception e)
+            {
+                print("Invalid input - Destination");
+                DestinationSelectController.destinationController.ResetFields();
+                messageField.text = "Invalid input";
+                messageActiveTime = 0;
+                return;
+            }
+
+            if (CheckDestination(day, month, year)) //Originally coded to check if the year is correct
+            {
+                messageField.text = "Calculating Destination";
+                yearAccepted = true;
+                timeTravelYear = int.Parse(destinationYearInput.text);
+                messageActiveTime = 0;
+            }
+            else
+            {
+                messageField.text = "Denied";
+                messageActiveTime = 0;
+                DestinationSelectController.destinationController.ResetFields();
+            }
+        }
+    }
+
     private void UpdatePresentDayFields()
     {
         float activeTimeRequirement = 1;
@@ -288,6 +409,7 @@ public class UserInterface : MonoBehaviour
             SetPresentDayFields("N/A", orangeNegative);
         }
     }
+
     private void SetPresentDayFields(string text, Color32 color)
     {
         SetTextField(presentDay, text, color);
@@ -301,7 +423,7 @@ public class UserInterface : MonoBehaviour
     private void UpdateDestinationFields()
     {
         float timeRequirement = 1;
-        float timeIncrement = 0.75f;
+        float timeIncrement = 0.2f;
 
         if (destinationCalculation < timeRequirement) return;
         timeRequirement += timeIncrement;
@@ -328,6 +450,7 @@ public class UserInterface : MonoBehaviour
         destinationFieldShouldBeUpdated = false;
         destinationReady = true;
     }
+
     private void SetDestinationFields(string text, Color32 color)
     {
         SetTextField(destinationDay, text, color);
@@ -339,7 +462,6 @@ public class UserInterface : MonoBehaviour
         destinationReady = false;
     }
 
-    
 
     private void SetTextField(TextMeshProUGUI field, string text, Color32 color)
     {
@@ -360,6 +482,26 @@ public class UserInterface : MonoBehaviour
         return false;
     }
 
+    private bool CheckDestination(int day, int month, int year)
+    {
+        if (day <= 0 || day > 31)
+        {
+            return false;
+        }
+
+        if (month <= 0 || month > 12)
+        {
+            return false;
+        }
+
+
+        int hour = Random.Range(1, 23);
+        int min = Random.Range(1, 59);
+        int sec = Random.Range(1, 59);
+        dates.Add(new DateType(year, day, month, year, hour, min, sec));
+        return true;
+    }
+
     private DateType FetchDateData(int year)
     {
         foreach (DateType dateType in dates)
@@ -373,7 +515,7 @@ public class UserInterface : MonoBehaviour
 
         return null;
     }
-    
+
     public void TweenOutReadyPrompt()
     {
         if (!timeTravelPromptActive) return;

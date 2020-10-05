@@ -165,7 +165,7 @@ public class WifiConnection
         myThread.Start();
     }
 
-    public void WriteToArduino(string dataOut)
+    public void WriteToEsp(string dataOut)
     {
         try
         {
@@ -199,7 +199,7 @@ public class WifiConnection
         
         Thread waitForPing = new Thread(() =>
         {
-            WriteToArduino($"Ping:{currentPing}");
+            WriteToEsp($"Ping:{currentPing}");
             
             Stopwatch sw = new Stopwatch();
             sw.Start();

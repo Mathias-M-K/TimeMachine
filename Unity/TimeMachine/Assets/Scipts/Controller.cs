@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using Michsky.UI.ModernUIPack;
 using TMPro;
 using UnityEngine;
@@ -35,7 +36,19 @@ public class Controller : MonoBehaviour
     private void Start()
     {
         player = GetComponent<AudioSource>();
-        ConnectToEsp();
+        try
+        {
+            StartCoroutine(DelayedConnect());
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            throw;
+        }
+        
+        
+        //AutomaticConnect(DataTransferClass.staticDataTransferClass.ip,int.Parse(DataTransferClass.staticDataTransferClass.port));
+        //ConnectToEsp();
     }
 
     // Update is called once per frame
@@ -58,17 +71,17 @@ public class Controller : MonoBehaviour
         
         if (Input.GetKeyUp(KeyCode.UpArrow) || Input.GetKeyUp(KeyCode.DownArrow))
         {
-            _comm.WriteToArduino("Servo:95");
+            _comm.WriteToEsp("Servo:95");
         }
 
         if (Input.GetKeyDown(KeyCode.UpArrow))
         {
-            _comm.WriteToArduino("Servo:1");
+            _comm.WriteToEsp("Servo:1");
         }
 
         if (Input.GetKeyDown(KeyCode.DownArrow))
         {
-            _comm.WriteToArduino("Servo:180");
+            _comm.WriteToEsp("Servo:180");
         }
         
         if (Input.GetKeyDown(KeyCode.Q))
@@ -95,8 +108,17 @@ public class Controller : MonoBehaviour
         pingShow.text = pingTime.ToString();
     }
 
+    public void AutomaticConnect(string ip, int port)
+    {
+        print("Trying to connect automatically");
+        if (connected) return;
+        
+        _comm.Begin(ip,port);
+    }
+
     public void ManualConnect()
     {
+        print("Trying to connect manually");
         if (connected)
         {
             return;
@@ -105,6 +127,7 @@ public class Controller : MonoBehaviour
     }
     public void ConnectToEsp()
     {
+        print("Trying to connect default");
         if (connected)
         {
             return;
@@ -126,8 +149,15 @@ public class Controller : MonoBehaviour
     public void InitiateTimeTravel()
     {
         player.Play();
-        _comm.WriteToArduino("TimeTravel:0");
+        _comm.WriteToEsp("TimeTravel:0");
     }
 
-    
+    private IEnumerator DelayedConnect()
+    {
+        yield return new WaitForSeconds(3);
+        AutomaticConnect(DataTransferClass.staticDataTransferClass.ip,int.Parse(DataTransferClass.staticDataTransferClass.port));
+        
+    }
+
+     
 }
