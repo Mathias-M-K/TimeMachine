@@ -29,8 +29,12 @@ public class ArduinoComms : MonoBehaviour
 
     [Tooltip("QueueLenght")]
     public int QueueLenght = 1;
-    
-    
+
+
+    private void Start()
+    {
+        PrintPorts();
+    }
 
     // Update is called once per frame
     void Update()
@@ -38,6 +42,10 @@ public class ArduinoComms : MonoBehaviour
         if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.C))
         {
             Begin(portName);
+        }
+        if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.S))
+        {
+            SmartConnect();
         }
 
         if (!_active) return;
@@ -101,5 +109,35 @@ public class ArduinoComms : MonoBehaviour
     public void DisconnectHandshake()
     {
         myDevice.send("Disconnect:0");
+    }
+
+    public void SmartConnect()
+    {
+        bool connected = false;
+        foreach (string s in SerialPort.GetPortNames())
+        {
+            try
+            {
+                print($"Trying {s}");
+                myDevice.set (s, baudRate, ReadTimeout, QueueLenght);
+                myDevice.connect ();
+            }
+            catch (Exception e)
+            {
+                myDevice.close();
+                continue;
+            }
+            
+            print($"connected to {s}");
+            _active = true;
+        }
+    }
+
+    public void PrintPorts()
+    {
+        foreach (string s in SerialPort.GetPortNames())
+        {
+            print(s);
+        }
     }
 }
